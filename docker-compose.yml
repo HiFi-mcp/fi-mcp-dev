@@ -8,3 +8,9 @@ services:
     volumes:
       - ./static:/app/static
       - ./test_data_dir:/app/test_data_dir
+    networks:
+      - shared-proxy
+
+networks:
+  shared-proxy:
+    external: true

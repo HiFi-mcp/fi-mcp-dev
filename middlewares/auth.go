@@ -93,7 +93,7 @@ func (m *AuthMiddleware) findRecentlyAuthedUser() string {
 
 // GetLoginUrl fetches dynamic login url for given sessionId
 func (m *AuthMiddleware) getLoginUrl(sessionId string) string {
-	return fmt.Sprintf("http://localhost:%s/mockWebPage?sessionId=%s", pkg.GetPort(), sessionId)
+	return fmt.Sprintf("https://fi-mcp.hifi.click/mockWebPage?sessionId=%s", sessionId)
 }
 
 func (m *AuthMiddleware) AddSession(sessionId, phoneNumber string) {
