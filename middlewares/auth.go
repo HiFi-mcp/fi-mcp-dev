@@ -111,3 +111,30 @@ func (m *AuthMiddleware) AddSession(sessionId, phoneNumber string) {
 	log.Printf("DEBUG: Session stored. Current store: %v", m.sessionStore)
 	log.Printf("DEBUG: User auth stored. Current auth: %v", m.userAuth)
 }
+
+func (m *AuthMiddleware) CheckSession(sessionId string) bool {
+	log.Printf("DEBUG: CheckSession called - sessionId: %s", sessionId)
+	
+	// Check if session exists in session mapping
+	phoneNumber, ok := m.sessionStore[sessionId]
+	if !ok {
+		log.Printf("DEBUG: No session found for sessionId: %s", sessionId)
+		return false
+	}
+	
+	// Check if user auth info exists
+	authInfo, ok := m.userAuth[phoneNumber]
+	if !ok {
+		log.Printf("DEBUG: No user auth found for phoneNumber: %s", phoneNumber)
+		return false
+	}
+	
+	// Check if auth has expired
+	if time.Now().Sub(authInfo.LoginTime) > m.authDuration {
+		log.Printf("DEBUG: User auth expired for phoneNumber: %s", phoneNumber)
+		return false
+	}
+	
+	log.Printf("DEBUG: Valid session found for sessionId: %s, phoneNumber: %s", sessionId, phoneNumber)
+	return true
+}

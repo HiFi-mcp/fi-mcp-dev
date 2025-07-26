@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+
+	"encoding/json"
+
 	"net/http"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -15,6 +18,26 @@ import (
 )
 
 var authMiddleware *middlewares.AuthMiddleware
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*") // You can restrict this to specific domains
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		
+		// Handle preflight OPTIONS request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 
 func main() {
 	authMiddleware = middlewares.NewAuthMiddleware()
@@ -43,11 +66,48 @@ func main() {
 	httpMux.Handle("/mcp/", streamableServer)
 	httpMux.HandleFunc("/mockWebPage", webPageHandler)
 	httpMux.HandleFunc("/login", loginHandler)
+	httpMux.HandleFunc("/check-session", checkSession)
+	corsHandler := corsMiddleware(httpMux)
 	port := pkg.GetPort()
 	log.Println("starting server on port:", port)
-	if servErr := http.ListenAndServe(fmt.Sprintf(":%s", port), httpMux); servErr != nil {
+	if servErr := http.ListenAndServe(fmt.Sprintf(":%s", port), corsHandler); servErr != nil {
 		log.Fatalln("error starting server", servErr)
 	}
+}
+
+func checkSession(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET method
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sessionId := r.URL.Query().Get("sessionId")
+	if sessionId == "" {
+		http.Error(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if session is valid using the middleware
+	if !authMiddleware.CheckSession(sessionId) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		response := map[string]interface{}{
+			"valid":   false,
+			"message": "Invalid or expired session",
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Session is valid
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]interface{}{
+		"valid":   true,
+		"message": "Session is valid",
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 func dummyHandler(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
